@@ -59,7 +59,7 @@ app.use(
 | Option | Required | Description |
 | --- | --- | --- |
 | `chain` | yes | Any viem `Chain` object. The CAIP-2 network id is derived from `chain.id`. |
-| `account` | yes | viem `Account` that signs settlement transactions and pays their gas. |
+| `account` | yes | viem `LocalAccount` (e.g. from `privateKeyToAccount`) that signs settlement transactions and pays their gas. |
 | `rpcUrl` | no | RPC override. Defaults to the chain's public RPC. |
 | `eip6492AllowedFactories` | no | Factory allowlist for ERC-6492 smart wallet deployment. Off by default. |
 

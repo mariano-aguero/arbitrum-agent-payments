@@ -48,13 +48,3 @@ export function getNetwork(chain?: string): NetworkConfig {
   }
   return networks[parsed.data];
 }
-
-/** Format an atomic USDC amount (6 decimals) as a display string like "0.01". */
-export function formatUsdc(atomic: bigint, decimals = 6): string {
-  const negative = atomic < 0n;
-  const abs = negative ? -atomic : atomic;
-  const base = 10n ** BigInt(decimals);
-  const whole = abs / base;
-  const frac = (abs % base).toString().padStart(decimals, "0").replace(/0+$/, "");
-  return `${negative ? "-" : ""}${whole}${frac ? `.${frac}` : ""}`;
-}

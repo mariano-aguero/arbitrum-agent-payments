@@ -54,7 +54,7 @@ The agent wallet only needs the payment token. With the EIP-3009 exact scheme th
 
 | Option | Required | Description |
 | --- | --- | --- |
-| `account` | yes | viem `Account` that signs payment authorizations. |
+| `account` | yes | viem `LocalAccount` (e.g. from `privateKeyToAccount`) that signs payment authorizations. |
 | `chain` | yes | Any viem `Chain`; the CAIP-2 network id derives from `chain.id`. |
 | `token` | yes | Payment token address; `decimals` defaults to 6. |
 | `apiBase` | yes | Origin allowlist. The tools refuse any URL on a different origin. |

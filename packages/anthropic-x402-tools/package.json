@@ -1,7 +1,7 @@
 {
   "name": "@mariano-aguero/anthropic-x402-tools",
   "version": "0.1.0",
-  "description": "Give a Claude agent the ability to pay for x402 APIs with USDC: a paying fetch tool and a balance tool for the Anthropic SDK tool runner",
+  "description": "Give a Claude agent the ability to pay for x402 APIs with ERC-20 tokens: a paying fetch tool and a balance tool for the Anthropic SDK tool runner",
   "license": "MIT",
   "author": "Mariano Aguero",
   "repository": {
@@ -52,7 +52,7 @@
     "@x402/fetch": "^2.21.0"
   },
   "peerDependencies": {
-    "@anthropic-ai/sdk": ">=0.100.0",
+    "@anthropic-ai/sdk": ">=0.100.0 <1.0.0",
     "viem": "^2.0.0",
     "zod": "^3.24.0 || ^4.0.0"
   },
