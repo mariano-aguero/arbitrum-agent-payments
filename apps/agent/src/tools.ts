@@ -1,0 +1,134 @@
+import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
+import { z } from "zod";
+import { decodePaymentResponseHeader } from "@x402/fetch";
+import { decodePaymentRequiredHeader } from "@x402/core/http";
+import { formatUsdc } from "@arbitrum-agent-payments/chains";
+import type { AgentWallet } from "./wallet.js";
+
+export interface PaymentRecord {
+  url: string;
+  amountUsdc: string;
+  txHash: string;
+}
+
+export interface ToolDeps {
+  wallet: AgentWallet;
+  /** Plain fetch, used to probe for 402 challenges before committing funds. */
+  plainFetch: typeof fetch;
+  /** x402-wrapped fetch that pays automatically when challenged. */
+  payingFetch: typeof fetch;
+  apiBase: string;
+  /** Every settled payment lands here so the caller can print a summary. */
+  payments: PaymentRecord[];
+}
+
+const errorResult = (error: string, detail: string) =>
+  JSON.stringify({ error, detail });
+
+/**
+ * The two tools the buyer agent gets. Payment is deliberately invisible to the
+ * model: it calls fetch_url, and the x402 client underneath handles the
+ * challenge/sign/settle dance. The tool only reports what happened.
+ */
+export function createAgentTools(deps: ToolDeps) {
+  const { wallet, apiBase, payments } = deps;
+
+  const fetchUrl = betaZodTool({
+    name: "fetch_url",
+    description:
+      "Fetch a URL from the demo API. If the endpoint requires payment, USDC payment is handled automatically from your wallet; the result tells you what was paid. Call this when the user's question needs data from the API.",
+    inputSchema: z.object({
+      url: z.string().describe("Absolute URL within the demo API base"),
+    }),
+    run: async ({ url }) => {
+      if (!url.startsWith(apiBase)) {
+        return errorResult("HTTP_ERROR", `URL must start with ${apiBase}`);
+      }
+
+      let probe: Response;
+      try {
+        probe = await deps.plainFetch(url);
+      } catch (cause) {
+        return errorResult("HTTP_ERROR", `request failed: ${String(cause)}`);
+      }
+
+      if (probe.status !== 402) {
+        const body = await probe.json().catch(() => null);
+        return JSON.stringify({ status: probe.status, body, payment: null });
+      }
+
+      // Challenged: check affordability before signing anything. In x402 v2
+      // the requirements ride in the base64 payment-required header.
+      const amount = readChallengeAmount(probe);
+      const balance = await wallet.usdcBalance();
+      if (balance < amount) {
+        return errorResult(
+          "INSUFFICIENT_FUNDS",
+          `endpoint costs ${formatUsdc(amount)} USDC but the wallet holds ${formatUsdc(balance)}`,
+        );
+      }
+
+      let paid: Response;
+      try {
+        paid = await deps.payingFetch(url);
+      } catch (cause) {
+        return errorResult("SETTLEMENT_FAILED", String(cause));
+      }
+      if (!paid.ok) {
+        return errorResult(
+          "SETTLEMENT_FAILED",
+          `paid request returned ${paid.status}: ${await paid.text().catch(() => "")}`,
+        );
+      }
+
+      const body = await paid.json().catch(() => null);
+      const receipt = readSettlement(paid);
+      const payment = {
+        made: true,
+        amountUsdc: formatUsdc(amount),
+        txHash: receipt ?? "unknown",
+      };
+      if (receipt) {
+        payments.push({ url, amountUsdc: payment.amountUsdc, txHash: receipt });
+      }
+      return JSON.stringify({ status: paid.status, body, payment });
+    },
+  });
+
+  const checkBalance = betaZodTool({
+    name: "check_balance",
+    description:
+      "Check the wallet's current USDC and ETH balance on the active network. Call this before paid requests if the user asks about affordability, or after a payment fails.",
+    inputSchema: z.object({}),
+    run: async () => JSON.stringify(await wallet.balances()),
+  });
+
+  return [fetchUrl, checkBalance];
+}
+
+/** Read the challenged amount (atomic USDC) from a 402 response. */
+function readChallengeAmount(res: Response): bigint {
+  const header = res.headers.get("payment-required");
+  if (!header) return 0n;
+  try {
+    const decoded = decodePaymentRequiredHeader(header) as {
+      accepts?: { amount?: string }[];
+    };
+    return BigInt(decoded.accepts?.[0]?.amount ?? "0");
+  } catch {
+    return 0n;
+  }
+}
+
+/** Pull the settlement tx hash out of the x402 payment-response header. */
+function readSettlement(res: Response): string | null {
+  const header =
+    res.headers.get("payment-response") ?? res.headers.get("x-payment-response");
+  if (!header) return null;
+  try {
+    const decoded = decodePaymentResponseHeader(header) as { transaction?: string };
+    return decoded.transaction ?? null;
+  } catch {
+    return null;
+  }
+}

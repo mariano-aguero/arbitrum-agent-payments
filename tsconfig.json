@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "packages/chains" },
-    { "path": "apps/seller" }
+    { "path": "apps/seller" },
+    { "path": "apps/agent" }
   ]
 }
