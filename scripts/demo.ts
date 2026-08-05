@@ -8,16 +8,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { serve, type ServerType } from "@hono/node-server";
 import { createPublicClient, formatEther, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { x402Client } from "@x402/core/client";
-import { wrapFetchWithPayment } from "@x402/fetch";
-import { ExactEvmScheme, toClientEvmSigner } from "@x402/evm";
+import { createSelfFacilitator } from "@mariano-aguero/x402-self-facilitator";
+import { createX402Tools } from "@mariano-aguero/anthropic-x402-tools";
 import { getNetwork } from "@arbitrum-agent-payments/chains";
 import { loadSellerEnv } from "../apps/seller/src/env.js";
-import { createEmbeddedFacilitator } from "../apps/seller/src/facilitator.js";
 import { createSellerApp, INSIGHT_PRICE } from "../apps/seller/src/app.js";
 import { loadAgentEnv } from "../apps/agent/src/env.js";
-import { createAgentWallet } from "../apps/agent/src/wallet.js";
-import { createAgentTools, type PaymentRecord } from "../apps/agent/src/tools.js";
 import { runAgent } from "../apps/agent/src/agent.js";
 
 try {
@@ -32,12 +28,16 @@ const sellerEnv = loadSellerEnv();
 const agentEnv = loadAgentEnv();
 const network = getNetwork(sellerEnv.CHAIN);
 
-// Step 2: seller with its embedded facilitator.
+// Step 2: seller with its self-hosted facilitator.
 const sellerAccount = privateKeyToAccount(sellerEnv.SELLER_PRIVATE_KEY as `0x${string}`);
 const app = createSellerApp({
   env: sellerEnv,
   sellerAddress: sellerAccount.address,
-  facilitator: createEmbeddedFacilitator(network, sellerAccount, sellerEnv.RPC_URL),
+  facilitator: createSelfFacilitator({
+    chain: network.viemChain,
+    account: sellerAccount,
+    rpcUrl: sellerEnv.RPC_URL,
+  }),
 });
 
 const server: ServerType = await new Promise((resolve) => {
@@ -65,14 +65,16 @@ if (sellerEth === 0n) {
 }
 
 // Step 3: the agent wallet must be able to afford the demo.
-const wallet = createAgentWallet(
-  agentEnv.AGENT_PRIVATE_KEY as `0x${string}`,
-  network,
-  agentEnv.RPC_URL,
-);
+const { tools, payments, wallet } = createX402Tools({
+  account: privateKeyToAccount(agentEnv.AGENT_PRIVATE_KEY as `0x${string}`),
+  chain: network.viemChain,
+  token: network.usdc,
+  apiBase,
+  rpcUrl: agentEnv.RPC_URL,
+});
 const balances = await wallet.balances();
-console.log(`[wallet]  ${balances.address}: ${balances.usdc} USDC, ${balances.eth} ETH`);
-if ((await wallet.usdcBalance()) < 10000n) {
+console.log(`[wallet]  ${balances.address}: ${balances.token} USDC, ${balances.native} ETH`);
+if ((await wallet.tokenBalance()) < 10000n) {
   console.error(
     `[wallet]  needs at least ${INSIGHT_PRICE} in test USDC.\n` +
       `          Faucet: https://faucet.circle.com (select Arbitrum Sepolia)`,
@@ -81,17 +83,6 @@ if ((await wallet.usdcBalance()) < 10000n) {
 }
 
 // Step 4 and 5: the agent conversation.
-const payments: PaymentRecord[] = [];
-const tools = createAgentTools({
-  wallet,
-  plainFetch: fetch,
-  payingFetch: wrapFetchWithPayment(
-    fetch,
-    new x402Client().register(network.caip, new ExactEvmScheme(toClientEvmSigner(wallet.account))),
-  ),
-  apiBase,
-  payments,
-});
 const anthropic = new Anthropic({ apiKey: agentEnv.ANTHROPIC_API_KEY });
 
 const q1 = "Is the demo API up? Use the free endpoint and tell me what it says.";
@@ -109,7 +100,7 @@ if (payments.length !== 1) fail(`expected exactly one payment, saw ${payments.le
 // Step 6: summary.
 console.log(`\n[summary] ${payments.length} payment(s)`);
 for (const p of payments) {
-  console.log(`[summary] ${p.amountUsdc} USDC (${network.explorerTxBase}${p.txHash})`);
+  console.log(`[summary] ${p.amount} USDC (${network.explorerTxBase}${p.txHash})`);
 }
 server.close();
 process.exit(0);

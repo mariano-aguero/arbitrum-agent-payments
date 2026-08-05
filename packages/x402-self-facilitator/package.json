@@ -1,0 +1,62 @@
+{
+  "name": "@mariano-aguero/x402-self-facilitator",
+  "version": "0.1.0",
+  "description": "Self-settle x402 payments on any EVM chain, in process, with no external facilitator service",
+  "license": "MIT",
+  "author": "Mariano Aguero",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mariano-aguero/arbitrum-agent-payments.git",
+    "directory": "packages/x402-self-facilitator"
+  },
+  "homepage": "https://github.com/mariano-aguero/arbitrum-agent-payments/tree/main/packages/x402-self-facilitator#readme",
+  "bugs": "https://github.com/mariano-aguero/arbitrum-agent-payments/issues",
+  "keywords": [
+    "x402",
+    "facilitator",
+    "payments",
+    "usdc",
+    "eip-3009",
+    "arbitrum",
+    "evm",
+    "viem",
+    "agentic-payments"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "dist",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      }
+    },
+    "main": "./dist/index.js"
+  },
+  "dependencies": {
+    "@x402/core": "^2.21.0",
+    "@x402/evm": "^2.21.0"
+  },
+  "peerDependencies": {
+    "viem": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "viem": "^2.55.10"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

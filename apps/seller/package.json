@@ -10,6 +10,7 @@
   "dependencies": {
     "@arbitrum-agent-payments/chains": "workspace:*",
     "@hono/node-server": "^1.14.0",
+    "@mariano-aguero/x402-self-facilitator": "workspace:*",
     "@x402/core": "^2.21.0",
     "@x402/evm": "^2.21.0",
     "@x402/hono": "^2.21.0",
@@ -18,6 +19,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^26.1.2"
+    "@types/node": "^26.1.2",
+    "@x402/fetch": "^2.21.0"
   }
 }

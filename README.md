@@ -7,7 +7,14 @@
 
 Watch an AI agent pay for API access with real USDC on Arbitrum, end to end, in one command.
 
-This starter kit wires together the three pieces of agentic payments so you don't have to figure them out separately:
+This repo ships two npm packages plus a runnable starter kit that uses them, so the demo doubles as living documentation:
+
+| Package | What it does |
+| --- | --- |
+| [`@mariano-aguero/x402-self-facilitator`](packages/x402-self-facilitator) [![npm](https://img.shields.io/npm/v/@mariano-aguero/x402-self-facilitator)](https://www.npmjs.com/package/@mariano-aguero/x402-self-facilitator) | Self-settle x402 payments on any EVM chain, in process, with no external facilitator service |
+| [`@mariano-aguero/anthropic-x402-tools`](packages/anthropic-x402-tools) [![npm](https://img.shields.io/npm/v/@mariano-aguero/anthropic-x402-tools)](https://www.npmjs.com/package/@mariano-aguero/anthropic-x402-tools) | Ready-made paying fetch and balance tools for Claude agents built on the Anthropic SDK tool runner |
+
+The kit wires together the three pieces of agentic payments so you don't have to figure them out separately:
 
 - **A seller**: a [Hono](https://hono.dev) API whose premium endpoint charges $0.01 USDC per request via the [x402 protocol](https://x402.org) (`@x402/hono`).
 - **A buyer**: a [Claude](https://platform.claude.com)-powered agent whose `fetch` tool pays 402 challenges automatically (`@x402/fetch` plus the Anthropic tool runner). The agent doesn't know about payments: it just fetches, and the wallet underneath handles the whole challenge, signature and settlement dance.
@@ -77,16 +84,18 @@ Point the agent at any x402-enabled API by changing `API_BASE_URL` in `.env`.
 ### Project layout
 
 ```
-apps/seller     Hono API + x402 middleware + embedded facilitator
-apps/agent      Claude tool-runner agent with a paying fetch tool
-packages/chains Network config: chain ids, USDC addresses, explorers
-scripts/demo.ts The scripted end-to-end run
+packages/x402-self-facilitator   published: in-process x402 facilitator for any EVM chain
+packages/anthropic-x402-tools    published: paying fetch and balance tools for Claude agents
+packages/chains                  internal: network config for the demo apps
+apps/seller                      Hono API + x402 middleware + self facilitator
+apps/agent                       Claude tool-runner agent using the tools package
+scripts/demo.ts                  the scripted end-to-end run
 ```
 
 ### Adapting it
 
 - **Price your own endpoints**: edit the routes config in `apps/seller/src/app.ts`; prices are plain dollar strings (`"$0.01"`), the scheme resolves them to USDC atomic units.
-- **Give your own agent payment powers**: copy `apps/agent/src/tools.ts`; the whole trick is wrapping `fetch` with `wrapFetchWithPayment` and handing it to a tool.
+- **Give your own agent payment powers**: `pnpm add @mariano-aguero/anthropic-x402-tools` and pass the tools to your tool runner; see the package README.
 - **Go to mainnet**: set `CHAIN=arbitrum` and fund the wallets with real USDC/ETH. Same code path.
 
 ## Testing

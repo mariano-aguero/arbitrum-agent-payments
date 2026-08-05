@@ -1,48 +1,50 @@
 import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
-import { decodePaymentResponseHeader } from "@x402/fetch";
-import { decodePaymentRequiredHeader } from "@x402/core/http";
-import { formatUsdc } from "@arbitrum-agent-payments/chains";
-import type { AgentWallet } from "./wallet.js";
+import { decodePaymentRequiredHeader, decodePaymentResponseHeader } from "@x402/core/http";
+import { formatTokenAmount, type X402Wallet } from "./wallet.js";
 
 export interface PaymentRecord {
   url: string;
-  amountUsdc: string;
+  amount: string;
   txHash: string;
 }
 
-export interface ToolDeps {
-  wallet: AgentWallet;
+export interface X402ToolDeps {
+  wallet: X402Wallet;
   /** Plain fetch, used to probe for 402 challenges before committing funds. */
   plainFetch: typeof fetch;
   /** x402-wrapped fetch that pays automatically when challenged. */
   payingFetch: typeof fetch;
+  /** Only URLs sharing this origin are ever fetched or paid. */
   apiBase: string;
   /** Every settled payment lands here so the caller can print a summary. */
   payments: PaymentRecord[];
+  /** Overrides the fetch_url tool description shown to the model. */
+  fetchToolDescription?: string;
 }
 
-const errorResult = (error: string, detail: string) =>
-  JSON.stringify({ error, detail });
+const errorResult = (error: string, detail: string) => JSON.stringify({ error, detail });
 
 /**
- * The two tools the buyer agent gets. Payment is deliberately invisible to the
- * model: it calls fetch_url, and the x402 client underneath handles the
- * challenge/sign/settle dance. The tool only reports what happened.
+ * Build the two payment tools from explicit dependencies. Most callers want
+ * createX402Tools from the package root, which wires the fetches and wallet
+ * for you; this variant exists for tests and custom transports.
  */
-export function createAgentTools(deps: ToolDeps) {
+export function createX402ToolsFromDeps(deps: X402ToolDeps) {
   const { wallet, apiBase, payments } = deps;
+  const decimals = wallet.tokenDecimals;
 
   const fetchUrl = betaZodTool({
     name: "fetch_url",
     description:
-      "Fetch a URL from the demo API. If the endpoint requires payment, USDC payment is handled automatically from your wallet; the result tells you what was paid. Call this when the user's question needs data from the API.",
+      deps.fetchToolDescription ??
+      `Fetch a URL from the API at ${apiBase}. If the endpoint requires payment, payment is handled automatically from your wallet; the result tells you what was paid. Call this when the user's question needs data from the API.`,
     inputSchema: z.object({
-      url: z.string().describe("Absolute URL within the demo API base"),
+      url: z.string().describe("Absolute URL within the API base"),
     }),
     run: async ({ url }) => {
-      // Compare origins, not string prefixes: "http://localhost:40210" and
-      // "http://localhost:4021@evil.com" both pass a startsWith check.
+      // Compare origins, not string prefixes: "http://host:40210" and
+      // "http://host:4021@evil.com" both pass a startsWith check.
       if (!isSameOrigin(url, apiBase)) {
         return errorResult("HTTP_ERROR", `URL must be within ${apiBase}`);
       }
@@ -68,11 +70,11 @@ export function createAgentTools(deps: ToolDeps) {
           "got a 402 without a readable payment-required header; refusing to pay blind",
         );
       }
-      const balance = await wallet.usdcBalance();
+      const balance = await wallet.tokenBalance();
       if (balance < amount) {
         return errorResult(
           "INSUFFICIENT_FUNDS",
-          `endpoint costs ${formatUsdc(amount)} USDC but the wallet holds ${formatUsdc(balance)}`,
+          `endpoint costs ${formatTokenAmount(amount, decimals)} but the wallet holds ${formatTokenAmount(balance, decimals)}`,
         );
       }
 
@@ -93,11 +95,11 @@ export function createAgentTools(deps: ToolDeps) {
       const receipt = readSettlement(paid);
       const payment = {
         made: true,
-        amountUsdc: formatUsdc(amount),
+        amount: formatTokenAmount(amount, decimals),
         txHash: receipt ?? "unknown",
       };
       if (receipt) {
-        payments.push({ url, amountUsdc: payment.amountUsdc, txHash: receipt });
+        payments.push({ url, amount: payment.amount, txHash: receipt });
       }
       return JSON.stringify({ status: paid.status, body, payment });
     },
@@ -106,7 +108,7 @@ export function createAgentTools(deps: ToolDeps) {
   const checkBalance = betaZodTool({
     name: "check_balance",
     description:
-      "Check the wallet's current USDC and ETH balance on the active network. Call this before paid requests if the user asks about affordability, or after a payment fails.",
+      "Check the wallet's current token and native balance on the active network. Call this before paid requests if the user asks about affordability, or after a payment fails.",
     inputSchema: z.object({}),
     run: async () => JSON.stringify(await wallet.balances()),
   });
@@ -124,7 +126,7 @@ function isSameOrigin(url: string, base: string): boolean {
 }
 
 /**
- * Read the challenged amount (atomic USDC) from a 402 response.
+ * Read the challenged amount (atomic token units) from a 402 response.
  * Returns null when the challenge is missing or unreadable, so callers can
  * refuse instead of treating a broken challenge as "free".
  */

@@ -1,11 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { createAgentTools } from "./tools.js";
+import type { X402Tools } from "@mariano-aguero/anthropic-x402-tools";
 
 export const AGENT_MODEL = "claude-opus-5";
 
 export interface RunAgentOptions {
   client: Anthropic;
-  tools: ReturnType<typeof createAgentTools>;
+  tools: X402Tools["tools"];
   apiBase: string;
   prompt: string;
   onText?: (text: string) => void;
