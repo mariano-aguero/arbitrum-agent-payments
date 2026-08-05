@@ -15,7 +15,11 @@ Because the exact scheme uses EIP-3009 `transferWithAuthorization`, your wallet 
 pnpm add @mariano-aguero/x402-self-facilitator viem
 ```
 
-`viem` 2.x is a peer dependency.
+`viem` 2.x is a peer dependency. Node 20 or newer. The usage example below also needs your server adapter and the EVM scheme:
+
+```bash
+pnpm add @x402/hono @x402/evm hono
+```
 
 ## Usage
 
@@ -28,7 +32,7 @@ import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { privateKeyToAccount } from "viem/accounts";
 import { arbitrumSepolia } from "viem/chains";
 
-const account = privateKeyToAccount(process.env.SELLER_PRIVATE_KEY);
+const account = privateKeyToAccount(process.env.SELLER_PRIVATE_KEY as `0x${string}`);
 const facilitator = createSelfFacilitator({ chain: arbitrumSepolia, account });
 
 app.use(
@@ -63,6 +67,10 @@ app.use(
 
 - Native currency for gas (it submits the `transferWithAuthorization` transactions).
 - Nothing else. It never custodies payer funds; tokens move straight from payer to `payTo`.
+
+### Token support
+
+The exact scheme settles EIP-3009 authorizations (USDC supports this on every chain Circle deploys to) and Permit2 payloads for other ERC-20s, both handled by `@x402/evm`. Pick a `payTo` token accordingly.
 
 ## When to use a hosted facilitator instead
 

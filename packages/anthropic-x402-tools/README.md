@@ -18,7 +18,7 @@ Safety rails built in: the allowlist compares parsed origins (immune to prefix a
 pnpm add @mariano-aguero/anthropic-x402-tools @anthropic-ai/sdk viem zod
 ```
 
-`@anthropic-ai/sdk`, `viem` and `zod` are peer dependencies.
+`@anthropic-ai/sdk`, `viem` and `zod` are peer dependencies. Node 20 or newer.
 
 ## Usage
 
@@ -29,7 +29,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { arbitrumSepolia } from "viem/chains";
 
 const { tools, payments } = createX402Tools({
-  account: privateKeyToAccount(process.env.AGENT_PRIVATE_KEY),
+  account: privateKeyToAccount(process.env.AGENT_PRIVATE_KEY as `0x${string}`),
   chain: arbitrumSepolia,
   token: { address: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d" }, // USDC
   apiBase: "https://api.example.com",
