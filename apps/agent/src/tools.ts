@@ -41,8 +41,10 @@ export function createAgentTools(deps: ToolDeps) {
       url: z.string().describe("Absolute URL within the demo API base"),
     }),
     run: async ({ url }) => {
-      if (!url.startsWith(apiBase)) {
-        return errorResult("HTTP_ERROR", `URL must start with ${apiBase}`);
+      // Compare origins, not string prefixes: "http://localhost:40210" and
+      // "http://localhost:4021@evil.com" both pass a startsWith check.
+      if (!isSameOrigin(url, apiBase)) {
+        return errorResult("HTTP_ERROR", `URL must be within ${apiBase}`);
       }
 
       let probe: Response;
@@ -60,6 +62,12 @@ export function createAgentTools(deps: ToolDeps) {
       // Challenged: check affordability before signing anything. In x402 v2
       // the requirements ride in the base64 payment-required header.
       const amount = readChallengeAmount(probe);
+      if (amount === null) {
+        return errorResult(
+          "HTTP_ERROR",
+          "got a 402 without a readable payment-required header; refusing to pay blind",
+        );
+      }
       const balance = await wallet.usdcBalance();
       if (balance < amount) {
         return errorResult(
@@ -106,17 +114,31 @@ export function createAgentTools(deps: ToolDeps) {
   return [fetchUrl, checkBalance];
 }
 
-/** Read the challenged amount (atomic USDC) from a 402 response. */
-function readChallengeAmount(res: Response): bigint {
+/** True when url shares scheme, host and port with base. */
+function isSameOrigin(url: string, base: string): boolean {
+  try {
+    return new URL(url).origin === new URL(base).origin;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Read the challenged amount (atomic USDC) from a 402 response.
+ * Returns null when the challenge is missing or unreadable, so callers can
+ * refuse instead of treating a broken challenge as "free".
+ */
+function readChallengeAmount(res: Response): bigint | null {
   const header = res.headers.get("payment-required");
-  if (!header) return 0n;
+  if (!header) return null;
   try {
     const decoded = decodePaymentRequiredHeader(header) as {
       accepts?: { amount?: string }[];
     };
-    return BigInt(decoded.accepts?.[0]?.amount ?? "0");
+    const amount = decoded.accepts?.[0]?.amount;
+    return amount ? BigInt(amount) : null;
   } catch {
-    return 0n;
+    return null;
   }
 }
 

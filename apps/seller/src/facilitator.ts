@@ -58,11 +58,10 @@ export function createEmbeddedFacilitator(
       return facilitator.settle(payload, requirements);
     },
     async getSupported(): Promise<SupportedResponse> {
-      return {
-        kinds: [{ x402Version: 2, scheme: "exact", network: network.caip }],
-        extensions: [],
-        signers: {},
-      };
+      // Delegate so supported kinds and signer addresses always reflect
+      // whatever schemes are actually registered above. The facilitator types
+      // its networks as plain strings; ours are CAIP-2 by construction.
+      return facilitator.getSupported() as SupportedResponse;
     },
   };
 }

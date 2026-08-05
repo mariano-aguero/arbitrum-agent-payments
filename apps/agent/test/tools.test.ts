@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { encodePaymentRequiredHeader } from "@x402/core/http";
+import { encodePaymentRequiredHeader, encodePaymentResponseHeader } from "@x402/core/http";
 import { getNetwork } from "@arbitrum-agent-payments/chains";
 import { createAgentTools, type PaymentRecord, type ToolDeps } from "../src/tools.js";
 import type { AgentWallet } from "../src/wallet.js";
@@ -69,6 +69,28 @@ describe("fetch_url tool", () => {
     expect(result.error).toBe("HTTP_ERROR");
   });
 
+  it("rejects same-prefix bypasses: port collisions and userinfo tricks", async () => {
+    const { deps } = buildDeps({});
+    // Same string prefix as http://localhost:4021 but a different origin.
+    for (const url of [
+      "http://localhost:40210/exfiltrate",
+      "http://localhost:4021@evil.com/steal",
+      "not a url at all",
+    ]) {
+      const result = await runFetchTool(deps, url);
+      expect(result.error, url).toBe("HTTP_ERROR");
+    }
+  });
+
+  it("refuses to pay a 402 whose challenge is unreadable", async () => {
+    const { deps } = buildDeps({
+      plainFetch: (async () => new Response("{}", { status: 402 })) as typeof fetch,
+    });
+    const result = await runFetchTool(deps, `${API_BASE}/api/insight`);
+    expect(result.error).toBe("HTTP_ERROR");
+    expect(result.detail).toMatch(/refusing to pay blind/);
+  });
+
   it("passes free responses through without payment", async () => {
     const { deps, payments } = buildDeps({
       plainFetch: (async () =>
@@ -96,14 +118,44 @@ describe("fetch_url tool", () => {
     expect(result.error).toBe("SETTLEMENT_FAILED");
   });
 
-  it("records the payment and reports the amount on success (AC-2)", async () => {
-    const { deps, payments } = buildDeps({});
+  it("records the payment with its tx hash on success (AC-2)", async () => {
+    const txHash = "0x" + "cd".repeat(32);
+    const { deps, payments } = buildDeps({
+      payingFetch: (async () =>
+        new Response("{}", {
+          status: 200,
+          headers: {
+            "payment-response": encodePaymentResponseHeader({
+              success: true,
+              transaction: txHash,
+              network: "eip155:421614",
+              payer: "0x0000000000000000000000000000000000000001",
+            }),
+          },
+        })) as typeof fetch,
+    });
     const result = await runFetchTool(deps, `${API_BASE}/api/insight`);
     expect(result.status).toBe(200);
-    const payment = result.payment as { made: boolean; amountUsdc: string };
+    const payment = result.payment as { made: boolean; amountUsdc: string; txHash: string };
     expect(payment.made).toBe(true);
     expect(payment.amountUsdc).toBe("0.01");
-    // No settlement header in the mock, so nothing lands in the summary list.
-    expect(payments).toHaveLength(0);
+    expect(payment.txHash).toBe(txHash);
+    expect(payments).toEqual([
+      { url: `${API_BASE}/api/insight`, amountUsdc: "0.01", txHash },
+    ]);
+  });
+});
+
+describe("check_balance tool", () => {
+  it("returns the wallet snapshot as JSON", async () => {
+    const { deps } = buildDeps({});
+    const [, checkBalance] = createAgentTools(deps);
+    const raw = await (checkBalance as { run: (input: object) => Promise<string> }).run({});
+    expect(JSON.parse(raw)).toEqual({
+      usdc: "1.25",
+      eth: "0.01",
+      address: "0x0000000000000000000000000000000000000001",
+      network: "arbitrum-sepolia",
+    });
   });
 });

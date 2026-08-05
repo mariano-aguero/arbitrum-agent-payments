@@ -6,6 +6,7 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { serve, type ServerType } from "@hono/node-server";
+import { createPublicClient, formatEther, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { x402Client } from "@x402/core/client";
 import { wrapFetchWithPayment } from "@x402/fetch";
@@ -47,6 +48,21 @@ console.log(`[seller]  listening on :${sellerEnv.PORT} (${network.key})`);
 
 const health = await fetch(`${apiBase}/api/free`);
 if (!health.ok) fail(`seller health check failed with ${health.status}`);
+
+// The seller submits settlement transactions, so it is the one that needs gas.
+const chainClient = createPublicClient({
+  chain: network.viemChain,
+  transport: http(sellerEnv.RPC_URL),
+});
+const sellerEth = await chainClient.getBalance({ address: sellerAccount.address });
+console.log(`[seller]  ${sellerAccount.address}: ${formatEther(sellerEth)} ETH for settlement gas`);
+if (sellerEth === 0n) {
+  console.error(
+    "[seller]  needs Sepolia ETH to submit settlements.\n" +
+      "          Faucet: https://faucet.arbitrum.io",
+  );
+  process.exit(1);
+}
 
 // Step 3: the agent wallet must be able to afford the demo.
 const wallet = createAgentWallet(

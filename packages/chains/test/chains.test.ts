@@ -28,4 +28,8 @@ describe("formatUsdc", () => {
     expect(formatUsdc(0n)).toBe("0");
     expect(formatUsdc(1000000n)).toBe("1");
   });
+
+  it("keeps the sign on negative amounts", () => {
+    expect(formatUsdc(-10000n)).toBe("-0.01");
+  });
 });
