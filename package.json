@@ -1,0 +1,31 @@
+{
+  "name": "arbitrum-agent-payments",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Starter kit: an AI agent paying for APIs with USDC on Arbitrum via the x402 protocol",
+  "scripts": {
+    "demo": "tsx scripts/demo.ts",
+    "seller": "pnpm --filter @arbitrum-agent-payments/seller start",
+    "agent": "pnpm --filter @arbitrum-agent-payments/agent start",
+    "test": "vitest run",
+    "typecheck": "tsc --build"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
+    "@arbitrum-agent-payments/chains": "workspace:*",
+    "@hono/node-server": "^1.14.0",
+    "@types/node": "^26.1.2",
+    "@x402/core": "^2.21.0",
+    "@x402/evm": "^2.21.0",
+    "@x402/fetch": "^2.21.0",
+    "tsx": "^4.23.5",
+    "typescript": "^7.0.2",
+    "viem": "^2.55.10",
+    "vitest": "^4.1.10"
+  },
+  "engines": {
+    "node": ">=20.12"
+  },
+  "packageManager": "pnpm@10.28.0"
+}

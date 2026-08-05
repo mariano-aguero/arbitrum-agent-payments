@@ -1,0 +1,15 @@
+{
+  "name": "@arbitrum-agent-payments/chains",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "viem": "^2.55.10",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2"
+  }
+}
