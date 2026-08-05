@@ -1,0 +1,23 @@
+{
+  "name": "@arbitrum-agent-payments/seller",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/app.ts",
+  "scripts": {
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@arbitrum-agent-payments/chains": "workspace:*",
+    "@hono/node-server": "^1.14.0",
+    "@x402/core": "^2.21.0",
+    "@x402/evm": "^2.21.0",
+    "@x402/hono": "^2.21.0",
+    "hono": "^4.13.0",
+    "viem": "^2.55.10",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2"
+  }
+}
