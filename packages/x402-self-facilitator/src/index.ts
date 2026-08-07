@@ -4,6 +4,7 @@ import { toFacilitatorEvmSigner } from "@x402/evm";
 import type { FacilitatorClient } from "@x402/core/server";
 import type {
   Network,
+  SchemeNetworkFacilitator,
   PaymentPayload,
   PaymentRequirements,
   SettleResponse,
@@ -30,6 +31,16 @@ export interface SelfFacilitatorConfig {
    * Off by default; see @x402/evm ExactEvmSchemeConfig.
    */
   eip6492AllowedFactories?: string[];
+  /**
+   * Extra schemes to serve alongside `exact`, registered on the same network.
+   *
+   * `exact` settles an EIP-3009 signature, which means the payer must hold a
+   * private key. A payer that is a contract has no key to sign with, so paying
+   * from a smart account needs a scheme built for it. Pass one here and this
+   * facilitator will serve both, letting one endpoint take payment from wallets
+   * and from contracts without running two facilitators.
+   */
+  schemes?: SchemeNetworkFacilitator[];
 }
 
 /**
@@ -79,6 +90,10 @@ export function createSelfFacilitator(config: SelfFacilitatorConfig): Facilitato
       eip6492AllowedFactories: config.eip6492AllowedFactories,
     }),
   );
+
+  for (const scheme of config.schemes ?? []) {
+    facilitator.register(network, scheme);
+  }
 
   return {
     verify(payload: PaymentPayload, requirements: PaymentRequirements): Promise<VerifyResponse> {
