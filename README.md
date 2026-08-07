@@ -98,6 +98,35 @@ scripts/demo.ts                  the scripted end-to-end run
 - **Give your own agent payment powers**: `pnpm add @mariano-aguero/anthropic-x402-tools` and pass the tools to your tool runner; see the package README.
 - **Go to mainnet**: set `CHAIN=arbitrum` and fund the wallets with real USDC/ETH. Same code path.
 
+## A real run, on Arbitrum Sepolia
+
+The output below is one `pnpm demo`, against the live testnet, not a mock:
+
+```
+[seller]  listening on :4021 (arbitrum-sepolia)
+[seller]  0x327a...b92C: 0.04 ETH for settlement gas
+[wallet]  0x771D...0525: 20 USDC, 0 ETH
+
+[agent]   Q1 (free): Is the demo API up? Use the free endpoint and tell me what it says.
+[agent]   Yes, the demo API is up. The free endpoint returned HTTP 200. No payment
+          was required or made. If you like, I can hit /api/insight, which costs
+          $0.01 USDC from my testnet wallet.
+
+[agent]   Q2 (paid): Buy me one premium insight about Arbitrum and quote it back to me.
+[agent]   "Arbitrum One settles more than half of all Ethereum L2 DeFi volume on
+          high-activity days."
+          Paid $0.01 USDC on Arbitrum Sepolia.
+
+[summary] 1 payment(s)
+[summary] 0.01 USDC (https://sepolia.arbiscan.io/tx/0xd87a230e...)
+```
+
+[The settlement transaction](https://sepolia.arbiscan.io/tx/0xd87a230ec1775ffcb622dca4b652729e219ec495ac00d580da89960f2659a290) is worth opening, because of who is missing from it. It was sent by the seller, who paid all 102,820 gas. The buyer's balance went from 20 USDC to 19.99 and its ETH balance was, before and after, exactly zero.
+
+That is the EIP-3009 path doing its job: the agent signed an authorization offline and never needed gas, or a bridge, or an ETH balance to top up. An agent that holds one stablecoin and nothing else can pay for things.
+
+The model decided when to pay, too. The free question was answered without a payment, and the demo fails if either question settles the wrong number of times.
+
 ## Testing
 
 ```bash
